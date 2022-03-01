@@ -1,5 +1,5 @@
 # Climate Change Cairns 1910-2019
-Please download html file (Climate_Change_Cairns.html) and open in web browser to view slide show. Alternative can just read Rmarkdown file which is the coding for the slide show (Climate_Change_Cairns.Rmd).
+Please download html file (Climate_Change_Cairns.html) and open in web browser to view slide show. Alternatively, just read Rmarkdown file which is the coding for the slide show (Climate_Change_Cairns.Rmd).
 
 
 ## How has the maximum temperature varied in Cairns Australia from between 1910 and 2019?
