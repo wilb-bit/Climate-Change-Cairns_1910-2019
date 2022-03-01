@@ -1,0 +1,274 @@
+---
+title: "Temperature increases at the Great Barrier Reef"
+author: "Bart Lewis (s3872549) & Wilbur Lewis (s3529819)"
+date: "Last updated: `r format(Sys.time(), '%d %B, %Y')`"
+output:
+  slidy_presentation:
+    font_adjustment: 0
+    highlight: haddock
+    mathjax: default
+    df_print: paged
+  ioslides_presentation:
+    highlight: haddock
+subtitle: Investigating changes in temperature in the Carins, Australia region
+---
+
+```{r setup, include=FALSE}
+# Use this chunk to quietly load your pacakges
+
+knitr::opts_chunk$set(
+	fig.align = "center",
+	message = FALSE,
+	warning = FALSE
+)
+# Packages loaded in this chunk will not appear in the presentation. 
+
+library(ggplot2) # Useful for creating plots
+library(dplyr)  # Useful for data maipulation
+library(knitr) # Useful for creating nice tables
+library(readr)
+library(tidyr)
+library(car)
+```
+
+# Introduction
+
+Climate change is a ever growing concern in the world today. One of its effects is increasing temperatures around the world. This can have unwanted effects on the environment, such as extinction of native animals and loss of vegetation. Coral reefs are very sensitive to temperature changes which can cause risk of heat stress and mass coral bleaching[1].  
+
+The Great Barrier Reef is the largest reef in the world and one of the seven wonders of the world. It may be heavily effected if it is found that temperatures are rising. This investigation will look to examine the question of whether maximum temperatures have changed in the Great Barrier Reef region by exploring maximum temperature recordings in Cairns, Australia.
+
+![Great Barrier Reef Source:ABC NEWS [2]](Great_Barrier.jpg)
+
+# Problem Statement
+
+How has the maximum temperature varied in Cairns Australia from between 1910 and 2019?
+
+We will answer this by: 
+
+- Tracking the average maximum temperature each year will show a general trend of how max temperature has changed. We will look to see if there is a trend towards higher temperatures.  
+
+- A two-sample t-tests of maximum temperature readings will be conducted for the two groups of (1910-1929) and (2000-2019). This will tell us if the difference in mean is statistically significant.
+
+![Temperature Rising Source:Pysh.com[3]](Higher_temp.jpg)
+
+# Data
+
+- Data set was taken from the Australian Government Bureau of Meteorology (BOM) which is responsible for providing weather services to Australia and surrounding areas[4]. 
+
+- The data is daily max temperature recorded from (1910-2019) at their station in Cairns Australia. This station is located at the Meteorological Office, on the western edge of Cairns Airport, on level, open ground over mowed grass[5]. 
+
+- Due to the long running data collection.The data has been 'homogenised' which means the data has been slightly adjusted to remove artificial biases such as a weather station moving, a change in the environment (i.e. a tree grows) or a change of measurement method. This 'homogenisation' has been rigorously reviewed by experts at BOM[6].
+
+For more information on the data and the collection method please see the References section (last slide)
+
+# Data Cont.
+## Variable Descriptions 
+
+- The data set "tmax" initially contained two variables. 
+
+- The first, "maximum temperature (degC)" which is the maximum temperature (Celsius) record at the Carnis BOM office. 
+
+- The second, "date" which contains the day, month and year in which the maximum temperature was recorded. "day", "month" and "year", were then separated into their own columns to allow for each column to only contain 1 variable. 
+
+- "year" was then converted into a numeric for the purposes of this investigation to allow for ease of manipulation. 
+
+
+```{r}
+tmax <- read_csv("tmax.031011.daily.csv")
+tmax <- tmax %>% separate(date, into = c("day","month","year"), sep = "/")
+tmax$year <- as.numeric(tmax$year)
+str(tmax)
+```
+
+# Descriptive Statistics and Visualisation
+
+## Missing Values
+
+To explore how max temperature has changed we will first check for missing data and outliers. The following code checks if more than 5% of max temperature readings are missing for each year. 
+
+It is found that their isn't. Since there is less than 5% we will just exclude these missing values as excluding such as small amount will have very little effect.
+
+```{r}
+x <- c(1910:2019)
+for (val in x) {
+  temp<-filter(tmax, year==val)
+  if(sum(!complete.cases(temp))/nrow(temp) > 0.05) print (val)
+}
+tmax <- tmax[complete.cases(tmax), ]
+```
+# Descriptive Statistics Cont.
+## Outliers 
+
+Through the use of a box plot we have also uncovered 196 outliers. It is unclear whether these are outliers due to some kind of error i.e. data entry errors, measurement errors, experimental errors. These outliers may be worth investigating as the extreme highs and lows may also be side effect of climate change. For this investigation, however, as they may bias the statistical results so they will be capped. 
+```{r}
+b1 <- boxplot(tmax$`maximum temperature (degC)`, ylab = "Max Daily Temperature (C)", xlab = "Cairns")
+cap <- function(x){
+    quantiles <- quantile( x, c(.05, 0.25, 0.75, .95 ) )
+    x[ x < quantiles[2] - 1.5*IQR(x) ] <- quantiles[1]
+    x[ x > quantiles[3] + 1.5*IQR(x) ] <- quantiles[4]
+    x
+}
+tmax$`maximum temperature (degC)` <- tmax$`maximum temperature (degC)` %>% cap()
+
+```
+
+
+# Descriptive Statistics Cont. 
+Next we will explore how the average max temperature changed each year.
+```{r}
+tmean <- tmax %>% group_by(year) %>% summarise(mean_temp = mean(`maximum temperature (degC)`, na.rm = TRUE))
+tmean$year <- as.numeric(tmean$year)
+p <- ggplot(data = tmean, aes(y = mean_temp, x = year))
+p + geom_point() + geom_smooth(se = FALSE, span = 0.6)  + labs(x = "Year", y = "Mean Temperature (C)") + 
+  scale_x_continuous(breaks = seq(1910, 2020, by = 20))
+
+```
+
+# Descriptive Statistics Cont. 
+As shown in the previous slide the average max temperature varies significantly from year to year. Also as shown by the trendline in the recent years the average max temperature has been the highest point over the past 130 years and is trending upwards. This suggests that the average maximum temperature is increasing. 
+
+But is this statistically significant? 
+
+To explore this we will investigate if the daily max temperature readings from the most recent years (2000-2019) are statistically significant different to that of (1910-1929). We will conduct hypothesis testing to determine this. We have chosen large sample sizes of 20 year periods because of the large variation between max temperature readings each year.
+
+# Hypothesis Testing
+## Two Sample t-test
+
+Two sample t-test on the temperature readings from the most recent years (2000-2019) compared to (1910-1929) will likely be used. the t-test has the following statistical hypotheses: 
+
+$$H_0: \mu_1 - \mu_2 = 0 $$
+H0: There will be no difference in maximum temperature readings from the two time periods (2000-2019) and (1910-1929).
+
+$$H_A: \mu_1 - \mu_2 \ne 0$$
+HA: There will be a difference in maximum temperature readings from the two time periods (2000-2019) and (1910-1929).
+
+Before we can undertake the testing we must manipulate the data set, test for normality, and test homogeneity of variance. 
+
+# Hypothesis Testing Cont. 
+
+## Mutating the Data Set
+
+Subsetting the data set into the two time periods to allow for the hypothesis testing to be undertaken. The data is filtered to only include the relevant time periods and is mutated to create one variables which are turned into factors. 
+```{r}
+t1910 <-filter(tmax, year>=1910, year<=1929)
+t2000 <- filter(tmax, year>=2000, year<=2019)
+
+t1910 <- t1910 %>% mutate(Period = "1910-1929")
+t2000 <- t2000 %>% mutate(Period = "2000-2019")
+
+t <- bind_rows(t1910,t2000)
+t$Period <- as.factor(t$Period)
+
+str(t)
+```
+
+# Hypothesis Testing Cont. 
+
+## Testing the Assumption of Normality 
+
+Due to the large sample sizes (n>30) testing for normality doesn't matter due to the central limit theorem. Which states when the sample size we use is large, typically defined as n>30, the sampling distribution of the mean is approximately normal, regardless of the variable’s underlying population distribution.
+
+Although not required for the body temperature example due to the large sample size, we will take a look at visual checking of normality using Q-Q. 
+
+# Hypothesis Testing Cont. 
+## Q-Q Plot 1910-1929
+Data appears to have departed from normality as it appears to have an S-shape.However, as the sample size is much larger than 30 we can ignore the issue with normality.  
+
+```{r}
+t1910$`maximum temperature (degC)` %>% qqPlot(dist="norm")
+```
+# Hypothesis Testing Cont. 
+## Q-Q Plot 2000-2019
+Data appears to have departed from normality. However, as the sample size is much larger than 30 we can ignore the issue with normality.  
+```{r}
+t2000$`maximum temperature (degC)` %>% qqPlot(dist="norm")
+```
+
+# Hypothesis Testing Cont. 
+
+## Homogeneity of Variance
+
+To determine what type of two-sample t-test we will perform we must test the assumption of equal variance. This is tested using Levene's test and has the following hypotheses:
+
+
+$$H_0: \sigma_1^{2} = \sigma_2^{2} $$
+H0: There is equal variance between max temperature in (1910-1929) and (2000-2019).
+
+$$H_A: \sigma_1^{2} \ne \sigma_2^{2} $$
+HA: There is not equal variance between max temperature in (1910-1929) and (2000-2019).
+
+```{r}  
+leveneTest(`maximum temperature (degC)` ~ Period, data = t)
+```
+
+- the p value was less than 0.05 and therefore reject H0. Therefore we cannot assume equal variance
+
+# Hypothesis Testing Cont. 
+
+## Two sample t-test Assuming Unequal Variance
+```{r}  
+t.test(
+  `maximum temperature (degC)` ~ Period,
+  data = t,
+  var.equal = FALSE,
+  alternative = "two.sided"
+)
+#Critical Value
+qt(p = 0.025, df = 14025)
+```
+# Two Sample t-test Findings 
+
+## t-statistic 
+
+- -7.282 is more extreme than -1.96 (|t| > |t*|), therefore statistically significant and H0 is rejected
+
+## p Value Approach
+
+- p = 3.451e-13, therefore p < 0.05. this is statistically significant and H0 is rejected.
+
+## Confidence Interval Approach
+
+- The 95% CI is -0.427 to -0.246. This does not capture H0 = 0 and therefore H0 is rejected.
+
+## Conclusion  
+
+- This concludes that at Cairns, the year period from (2000-2019) had a higher average max temperature than the year period of (1910-1929). The difference between the mean temperatures was 0.337. 
+
+# Discussion
+
+A two-sample t-test was used to test for a significant difference between the mean max temperature between (1910-1929) and (2000-2019). After confirming normality and homogeneity of variance. The two-sample t-test results assuming unequal variance found a statistically significant difference between the mean maximum temperatures, t(df=14025)=-7.282, p= 3.451e-13, 95% CI for the difference in means [-0.427, -0.246]. 
+
+## Final Conclusion 
+
+Therefore overall the investigation indicated (2000-2019) time period maximum temperatures have significantly higher average maximum temperatures than (1910-1929) time period.
+
+This is a worrying sign for climate change and Great Barrier Reef. When combined with the earlier analysis showing a trend towards warmer temperatures, it further suggests that the region surrounding the Great Barrier Reef is slowly warming which may have a significant effect on one of the seven wonders of the world. 
+
+# Discussion Cont. 
+
+## Strengths and Weaknesses 
+
+- Strength: Information collected from BOM who are highly skilled at measuring the weather. 
+- Weakness: Sampling of the sea surface areas around the Great Barrier Reef would provide a better insight. 
+- Weakness: Changes were made to the data to account for artificial biases which may cause experiment errors if not done correctly. 
+
+## Potential Further Investigation 
+- Investigate the changes in sea surface temperatures and other measurable varibales to further understand the changes occuring at the Great Barrier Reef. 
+
+- Investigate temperature changes at other larger reefs to determine whether they are also likely to be effected by higher maximum temperatures. 
+
+# References
+
+[1]"Sea temperature", Australian Government - Great Barrier Reef Marine Park Authority, 2020. [Online]. Available: http://www.gbrmpa.gov.au/our-work/threats-to-the-reef/climate-change/sea-temperature#:~:text=In%20the%20Coral%20Sea%20over,years%20in%20the%20late%201800s. [Accessed: 25- Oct- 2020].
+
+[2]G. Torda, "Great Barrier Reef to get 500m to breed more resilient coral, reduce pollution", ABC News, 2018. [Online]. Available: https://www.abc.net.au/news/2018-04-29/great-barrier-reef-500m-package-to-preserve-area/9708230. [Accessed: 25- Oct- 2020].
+
+[3]"High temperature records will be 'smashed' in coming century", Phys.org, 2019. [Online]. Available: https://phys.org/news/2019-06-high-temperature-century.html. [Accessed: 25- Oct- 2020].
+
+[4]"Australian Climate Observations Reference Network – Surface Air Temperature (ACORN-SAT) - Datav2", Australian Government - Bureau of Meteorology, 2020. [Online]. Available: http://ftp://ftp.bom.gov.au/anon/home/ncc/www/change/ACORN_SAT_daily/. [Accessed: 25- Oct- 2020].
+
+[5]"ACORN-SAT Station Catalogue - Cairns", Australian Government - Bureau of Meteorology, 2020. [Online]. Available: http://www.bom.gov.au/climate/data/acorn-sat/stations/#/31011. [Accessed: 25- Oct- 2020].
+
+[6]"Australian Climate Observations Reference Network – Surface Air Temperature - FAQ", Australian Government - Bureau of Meteorology, 2020. [Online]. Available: http://www.bom.gov.au/climate/data/acorn-sat/#tabs=FAQs. [Accessed: 25- Oct- 2020].
+
+
